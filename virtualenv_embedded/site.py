@@ -235,13 +235,16 @@ def addsitepackages(known_paths, sys_prefix=sys.prefix, exec_prefix=sys.exec_pre
                                          "site-packages"),
                             os.path.join(prefix, "lib", "site-python"),
                             os.path.join(prefix, "python" + sys.version[:3], "lib-dynload")]
-                lib64_dir = os.path.join(prefix, "lib64", "python" + sys.version[:3], "site-packages")
-                if (os.path.exists(lib64_dir) and 
-                    os.path.realpath(lib64_dir) not in [os.path.realpath(p) for p in sitedirs]):
-                    if sys.maxsize > 2**32:
-                        sitedirs.insert(0, lib64_dir)
-                    else:
-                        sitedirs.append(lib64_dir)
+                def _add_libx(libx, insert):
+                    libx_dir = os.path.join(prefix, libx, "python" + sys.version[:3], "site-packages")
+                    if (os.path.exists(libx_dir) and 
+                        os.path.realpath(libx_dir) not in [os.path.realpath(p) for p in sitedirs]):
+                        if insert():
+                            sitedirs.insert(0, libx_dir)
+                        else:
+                            sitedirs.append(libx_dir)
+                _add_libx('lib64', lambda: sys.maxsize > 2**32)
+                _add_libx('libx32', lambda: sys.maxsize <= 2**32)
                 try:
                     # sys.getobjects only available in --with-pydebug build
                     sys.getobjects
@@ -578,12 +581,15 @@ def virtual_install_main_packages():
     else:
         paths = [os.path.join(sys.real_prefix, 'lib', 'python'+sys.version[:3])]
         hardcoded_relative_dirs = paths[:] # for the special 'darwin' case below
-        lib64_path = os.path.join(sys.real_prefix, 'lib64', 'python'+sys.version[:3])
-        if os.path.exists(lib64_path):
-            if sys.maxsize > 2**32:
-                paths.insert(0, lib64_path)
-            else:
-                paths.append(lib64_path)
+        def _add_libx(libx, insert):
+            libx_path = os.path.join(sys.real_prefix, libx, 'python'+sys.version[:3])
+            if os.path.exists(libx_path):
+                if insert():
+                    paths.insert(0, libx_path)
+                else:
+                    paths.append(libx_path)
+        _add_libx('lib64', lambda: sys.maxsize > 2**32)
+        _add_libx('libx32', lambda: sys.maxsize <= 2**32)
         # This is hardcoded in the Python executable, but relative to sys.prefix:
         plat_path = os.path.join(sys.real_prefix, 'lib', 'python'+sys.version[:3],
                                  'plat-%s' % sys.platform)
